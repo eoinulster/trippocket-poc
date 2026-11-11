@@ -1,41 +1,62 @@
-const CACHE = "trippocket-v1";
-self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/icon.svg"])));
-  self.skipWaiting();
-});
-self.addEventListener("activate", (e) => {
-  e.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)),
-        ),
-      ),
+const CACHE = "trippocket-v2";
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      const response = await fetch("/", { cache: "reload" });
+      if (!response.ok) throw new Error("App shell unavailable");
+      const html = await response.clone().text();
+      const assets = [
+        ...html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g),
+      ].map((match) => match[1]);
+      // Cache the initial bundle before activation, so a second online visit is not needed.
+      await cache.addAll(["/icon.svg", ...assets]);
+      await cache.put("/", response);
+      await self.skipWaiting();
+    })(),
   );
-  self.clients.claim();
 });
-self.addEventListener("fetch", (e) => {
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((key) => key.startsWith("trippocket-") && key !== CACHE)
+          .map((key) => caches.delete(key)),
+      );
+      await self.clients.claim();
+    })(),
+  );
+});
+self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
   if (
-    e.request.method !== "GET" ||
-    new URL(e.request.url).origin !== self.location.origin ||
-    new URL(e.request.url).pathname.startsWith("/api/")
+    event.request.method !== "GET" ||
+    url.origin !== self.location.origin ||
+    url.pathname.startsWith("/api/")
   )
     return;
-  e.respondWith(
-    fetch(e.request)
-      .then((r) => {
-        if (r.ok) {
-          const copy = r.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, copy));
+  event.respondWith(
+    (async () => {
+      try {
+        const response = await fetch(event.request);
+        if (response.ok) {
+          const copy = response.clone();
+          event.waitUntil(
+            caches.open(CACHE).then((cache) => cache.put(event.request, copy)),
+          );
         }
-        return r;
-      })
-      .catch(
-        async () =>
-          (await caches.match(e.request)) ||
-          (e.request.mode === "navigate" ? await caches.match("/") : null) ||
-          Response.error(),
-      ),
+        return response;
+      } catch {
+        return (
+          (await caches.match(event.request)) ||
+          (event.request.mode === "navigate"
+            ? await caches.match("/")
+            : null) ||
+          Response.error()
+        );
+      }
+    })(),
   );
 });
