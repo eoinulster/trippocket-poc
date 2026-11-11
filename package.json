@@ -1,0 +1,39 @@
+{
+  "name": "trippocket-poc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:api": "node --env-file-if-exists=.env server/local.mjs",
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "deploy": "npm run build && node --env-file=.env scripts/deploy.mjs",
+    "db:setup": "node --env-file-if-exists=.env scripts/setup-db.mjs",
+    "scan:public": "node scripts/scan-public.mjs",
+    "format": "prettier --write src server api scripts tests public/sw.js *.json *.ts README.md index.html"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0",
+    "jsqr": "^1.4.0",
+    "lucide-react": "^0.468.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "prettier": "^3.10.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.0",
+    "vitest": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
